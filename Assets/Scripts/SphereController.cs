@@ -17,9 +17,6 @@ public class SphereController : NetworkBehaviour
         controller = GetComponent<CharacterController>();
         playerInput = GetComponent<PlayerInput>();
     }
-    void Start()
-    {
-    }
     public override void FixedUpdateNetwork()
     {
         var moveInput = playerInput.actions["Move"].ReadValue<Vector2>();
