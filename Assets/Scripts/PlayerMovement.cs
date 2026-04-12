@@ -8,7 +8,7 @@ public class PlayerMovement : NetworkBehaviour
     private PlayerInput playerInput;
     private CharacterController controller;
     private PlayerProperties playerProperties;
-    [HideInInspector] public bool isMovementEnabled;
+    [HideInInspector, Networked] public bool isMovementEnabled {  get; set; } = false;
 
     private Vector3 moveDirection;
     public float speed;
@@ -19,36 +19,45 @@ public class PlayerMovement : NetworkBehaviour
     private bool isJumping;
     private bool canJump;
     private bool isSounding;
-
+    private bool soundPressed;
+    private Vector2 moveInput;
+    private bool isJumpPressed = false;
+    [HideInInspector] public bool isSkillEnabled = false;
     private float verticalVelocity;
+    private Coroutine disguiseResetCoroutine;
+    private int disguiseTime = 15;
+    private CanvaController canvaController;
 
     void Awake()
     {
         controller = GetComponent<CharacterController>();
         playerInput = GetComponent<PlayerInput>();
         playerProperties = GetComponent<PlayerProperties>();
+        canvaController = GameObject.FindWithTag("Canva").GetComponent<CanvaController>();
 
         canJump = true;
+        isMoving = false;
+        isJumping = false;
     }
 
     public override void FixedUpdateNetwork()
     {
         if (!Object.HasInputAuthority) return;
+
         if (controller == null || !controller.enabled) return;
 
-        var soundPressed = playerInput.actions["Interact"].IsPressed();
+        soundPressed = playerInput.actions["Interact"].IsPressed();
         MakeSound(soundPressed);
 
         if (isMovementEnabled)
         {
-            var moveInput = playerInput.actions["Move"].ReadValue<Vector2>();
-            bool isJumpPressed = playerInput.actions["Jump"].IsPressed();
-
-            CheckIsMoving(moveInput);
-            UpdateAnim(moveInput);
-            Jump(isJumpPressed);
-            MoveWithCameraDirection(moveInput);
+            moveInput = playerInput.actions["Move"].ReadValue<Vector2>();
+            isJumpPressed = playerInput.actions["Jump"].IsPressed();
         }
+        CheckIsMoving(moveInput);
+        UpdateAnim(moveInput);
+        Jump(isJumpPressed);
+        MoveWithCameraDirection(moveInput);
         GravitySimulate();
 
         Vector3 horizontal = moveDirection * speed;
@@ -56,6 +65,63 @@ public class PlayerMovement : NetworkBehaviour
 
         controller.Move((horizontal + vertical) * Runner.DeltaTime);
 
+    }
+    private void Update()
+    {
+        if (!Object.HasInputAuthority) return;
+
+        if (Keyboard.current.qKey.wasPressedThisFrame && isSkillEnabled)
+        {
+            DoSkill();
+        }
+    }
+    private void DoSkill()
+    {
+        if (playerProperties.isSeeker)
+        {
+            if (!playerProperties.attackEffect.gameObject.activeSelf)
+            {
+                if (playerProperties.UseMana(30f)) playerProperties.isAttacking = true;
+            }
+        }
+        else
+        {
+            if (playerProperties.disguiseIndex == 0)
+            {
+                // pick a random disguise (ensure there is at least one)
+                if (playerProperties.disguiseProps != null && playerProperties.disguiseProps.Count > 1)
+                {
+                    playerProperties.disguiseIndex = Random.Range(1, playerProperties.disguiseProps.Count);
+
+                    // start/reset the timer that will revert the disguise after 15s
+                    if (disguiseResetCoroutine != null) StopCoroutine(disguiseResetCoroutine);
+                    disguiseResetCoroutine = StartCoroutine(ResetDisguiseAfterDelay(disguiseTime));
+                    if(canvaController != null) canvaController.OpenDisguiseHub(playerProperties.NickName.ToString(), playerProperties.Hp, playerProperties.Mana, disguiseTime);
+                }
+            }
+            else
+            {
+                // cancel pending reset and immediately revert
+                if (disguiseResetCoroutine != null) { StopCoroutine(disguiseResetCoroutine); disguiseResetCoroutine = null; }
+                playerProperties.disguiseIndex = 0;
+                if(canvaController != null) canvaController.CloseDisguiseHub();
+            }
+        }
+    }
+
+    private IEnumerator ResetDisguiseAfterDelay(float delay)
+    {
+        for (int i = 0; i < delay; i++)
+        {
+            yield return new WaitForSecondsRealtime(1f);
+
+        }
+        // ensure only the input-authority instance writes the networked property
+        if (Object != null && Object.HasInputAuthority)
+        {
+            playerProperties.disguiseIndex = 0;
+        }
+        disguiseResetCoroutine = null;
     }
     private void MakeSound(bool soundPressed)
     {
@@ -95,7 +161,7 @@ public class PlayerMovement : NetworkBehaviour
     }
     private void Jump(bool isJumpPressed)
     {
-        if (isGrounded && isJumpPressed && canJump && playerProperties.UseMana(50f))
+        if (isGrounded && isJumpPressed && canJump && playerProperties.UseMana(20f))
         {
             isJumping = true;
             StartCoroutine(JumpCoolDown());
@@ -160,7 +226,7 @@ public class PlayerMovement : NetworkBehaviour
         }
         else
         {
-            moveDirection = Vector3.zero; // 🔥 QUAN TRỌNG
+            moveDirection = Vector3.zero;
         }
     }
 }

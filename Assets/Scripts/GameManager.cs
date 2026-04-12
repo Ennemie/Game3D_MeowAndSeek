@@ -1,50 +1,304 @@
-using UnityEngine;
 using Fusion;
-using System.Collections.Generic;
-using Unity.Cinemachine;
 using System.Collections;
+using System.Collections.Generic;
+using System.Linq;
+using UnityEngine;
 
 public class GameManager : NetworkBehaviour
 {
     public static GameManager Instance { get; private set; }
 
-    [SerializeField] private GameObject playerPrefab;
-    private List<PlayerRef> spawnedPlayers = new List<PlayerRef>();
+    [Header("Networked Properties")]
+    [Networked, OnChangedRender(nameof(OnGameStartedChanged))]
+    public NetworkBool GameStarted { get; set; } = false;
 
-    [Header("Player Name")]
+    [Networked] public int CountReady { get; set; }
+    [Networked] public PlayerRef SeekerPlayerRef { get; set; } = PlayerRef.None;
+    [Networked] public TickTimer RoleTimer { get; set; }
+    [Networked] public int GameTime { get; set; }
 
+    [Header("References")]
+    private CanvaController canva;
+    private GameObject _openingCam;
+    private bool isLocalSeeker = false;
 
-    [Header("Cameras")]
-    public CinemachineCamera openingCam;
-    public CinemachineCamera playerCam;
+    private int seekerCount;
+    private int hiderCount;
 
     private void Awake()
     {
-        if (Instance == null)
-        {
-            Instance = this;
-            DontDestroyOnLoad(gameObject);
-        }
-        playerPrefab.GetComponent<PlayerMovement>().isMovementEnabled = true; ////XXXX
+        if (Instance == null) { Instance = this; DontDestroyOnLoad(gameObject); }
+        else { Destroy(gameObject); }
     }
+
     public override void Spawned()
     {
-        // Trong Shared Mode, chúng ta kiểm tra nếu người chơi vừa tham gia
-        // chính là bản thân mình (Local Player) thì tiến hành Spawn
-        if (Runner.IsSharedModeMasterClient)
+        Instance = this;
+        canva = GameObject.FindWithTag("Canva")?.GetComponent<CanvaController>();
+        _openingCam = GameObject.FindWithTag("OpeningCamera");
+
+        if (GameStarted)
         {
-            Debug.Log("GameManager khởi tạo bởi Master Client");
+            OnGameStartedChanged();
+        }
+    }
+
+    private void OnGameStartedChanged()
+    {
+        if (GameStarted)
+        {
+            StartGameLogic();
+        }
+        else
+        {
+            EndGameLogic();
+        }
+    }
+
+    private IEnumerator ResetGame()
+    {
+        yield return new WaitForSeconds(5f);
+        if (!Object.HasStateAuthority) yield break;
+
+        // Reset networked state
+        GameStarted = false;
+        CountReady = 0;
+        SeekerPlayerRef = PlayerRef.None;
+        RoleTimer = TickTimer.None;
+        GameTime = 180;
+
+        // Teleport players back to spawn points and reset their properties
+        var playerSpawn = FindObjectOfType<PlayerSpawn>();
+        Transform[] spawnPoints = null;
+        if (playerSpawn != null)
+        {
+            // access private serialized field spawnPoints via reflection
+            var fi = typeof(PlayerSpawn).GetField("spawnPoints", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
+            if (fi != null)
+            {
+                spawnPoints = fi.GetValue(playerSpawn) as Transform[];
+            }
         }
 
-        // Tự động Spawn nhân vật cho chính Client này
-        AddSpawnedPlayer(Runner.LocalPlayer);
+        var playersList = Runner.ActivePlayers.ToList();
+        playersList.Sort((a, b) => a.RawEncoded.CompareTo(b.RawEncoded));
+
+        for (int i = 0; i < playersList.Count; i++)
+        {
+            var player = playersList[i];
+            var playerObj = Runner.GetPlayerObject(player);
+            if (playerObj == null) continue;
+
+            // Teleport to spawn point if available
+            if (spawnPoints != null && spawnPoints.Length > 0)
+            {
+                int index = i;
+                index = Mathf.Clamp(index, 0, spawnPoints.Length - 1);
+
+                var target = spawnPoints[index];
+                if (target != null)
+                {
+                    var cc = playerObj.GetComponent<CharacterController>();
+                    if (cc != null) cc.enabled = false;
+
+                    playerObj.transform.position = target.position;
+                    playerObj.transform.rotation = target.rotation;
+
+                    if (cc != null) cc.enabled = true;
+                }
+            }
+
+            // Reset player properties back to default
+            var props = playerObj.GetComponent<PlayerProperties>();
+            var mov = playerObj.GetComponent<PlayerMovement>();
+            if (props != null)
+            {
+                // if this player was a seeker, revert any speed buff applied
+                if (props.isSeeker && mov != null)
+                {
+                    mov.speed = mov.speed / 1.2f;
+                }
+
+                props.isSeeker = false;
+                props.isDead = false;
+                props.Hp = props.hpBar != null ? props.hpBar.maxValue : 100f;
+                props.Mana = props.manaBar != null ? props.manaBar.maxValue : 100f;
+                props.disguiseIndex = 0;
+                props.isAttacking = false;
+                props.isShieldActive = false;
+
+                if (props.attackEffect != null) props.attackEffect.gameObject.SetActive(false);
+                if (props.shield != null) props.shield.SetActive(false);
+            }
+
+            if (mov != null)
+            {
+                mov.isMovementEnabled = false;
+                mov.isSkillEnabled = false;
+            }
+        }
+
+        // Optionally reset manager-local counters
+        seekerCount = 0;
+        hiderCount = 0;
     }
-    private void AddSpawnedPlayer(PlayerRef player)
+
+    public void HiderCountUpdate()
     {
-        spawnedPlayers.Add(player);
+        hiderCount--;
+        if (hiderCount <= 0 && Object.HasStateAuthority)
+        {
+            GameStarted = false;
+        }
     }
-    public void DisableOpeningCam()
+
+    private void StartGameLogic()
     {
-        openingCam.gameObject.SetActive(false);
+        if (_openingCam != null) _openingCam.SetActive(false);
+
+        seekerCount = 0;
+        hiderCount = 0;
+
+        foreach (var player in Runner.ActivePlayers)
+        {
+            var playerObj = Runner.GetPlayerObject(player);
+            if (playerObj != null)
+            {
+                var props = playerObj.GetComponent<PlayerProperties>();
+                if (props != null)
+                {
+                    if (player == SeekerPlayerRef) seekerCount++;
+                    else hiderCount++;
+                }
+            }
+        }
+        Debug.Log(seekerCount + " seeker(s) and " + hiderCount + " hider(s) in the game.");
+
+        StartCoroutine(DisplayGameTimeRoutine());
+        SetUpRolesAndPermissions();
+    }
+
+    private void SetUpRolesAndPermissions()
+    {
+        var myObj = Runner.GetPlayerObject(Runner.LocalPlayer);
+        if (myObj == null) return;
+
+        var props = myObj.GetComponent<PlayerProperties>();
+        var mov = myObj.GetComponent<PlayerMovement>();
+
+        isLocalSeeker = (SeekerPlayerRef == Runner.LocalPlayer);
+
+        if (isLocalSeeker && props != null)
+        {
+            props.isSeeker = true;
+            if (mov != null) mov.speed *= 1.2f;
+        }
+
+        StartCoroutine(RoleCountdownRoutine(mov));
+    }
+
+    private IEnumerator RoleCountdownRoutine(PlayerMovement mov)
+    {
+        while (RoleTimer.IsRunning && !RoleTimer.Expired(Runner))
+        {
+            float? remaining = RoleTimer.RemainingTime(Runner);
+            int seconds = Mathf.CeilToInt(remaining ?? 0);
+
+            if (isLocalSeeker)
+            {
+                canva.readiedHubText.text = $"BẠN LÀ <color=red>SEEKER</color>! ĐỢI TRONG: {seconds}";
+                if (mov != null) mov.isMovementEnabled = false;
+            }
+            else
+            {
+                canva.readiedHubText.text = $"BẠN LÀ <color=green>HIDER</color>! TRỐN ĐI: {seconds}";
+                if (mov != null)
+                {
+                    mov.isMovementEnabled = true;
+                    mov.isSkillEnabled = true;
+                }
+            }
+            yield return new WaitForSeconds(0.2f);
+        }
+
+        if (mov != null)
+        {
+            mov.isMovementEnabled = true;
+            mov.isSkillEnabled = true;
+        }
+
+        canva.readiedHubText.text = isLocalSeeker ? "BẮT ĐẦU ĐI SĂN!" : "SEEKER ĐÃ BẮT ĐẦU ĐI SĂN!";
+
+        yield return new WaitForSeconds(3f);
+        canva.readiedHub.SetActive(false);
+    }
+
+    private IEnumerator DisplayGameTimeRoutine()
+    {
+        int timer = GameTime;
+        while (timer > 0 && GameStarted)
+        {
+            if (canva != null) canva.UpdateGameTime(timer);
+            yield return new WaitForSeconds(1f);
+            timer--;
+        }
+
+        if (Object.HasStateAuthority && GameStarted)
+        {
+            GameStarted = false;
+        }
+    }
+
+    private void EndGameLogic()
+    {
+        if (canva != null)
+        {
+            canva.readiedHub.SetActive(true);
+            canva.HideDeadHub();
+            canva.readiedHubText.text = "GAME KẾT THÚC!";
+        }
+
+        if (hiderCount > 0)
+        {
+            if (canva != null) canva.readiedHubText.text += $"\n<color=green>HIDER THẮNG!</color>";
+        }
+        else
+        {
+            if (canva != null) canva.readiedHubText.text += $"\n<color=red>SEEKER THẮNG!</color>";
+        }
+    }
+
+    public void PlayerReadied()
+    {
+        if (Object != null && Object.IsValid) RPC_RequestReady();
+    }
+
+    [Rpc(RpcSources.All, RpcTargets.StateAuthority)]
+    private void RPC_RequestReady()
+    {
+        CountReady++;
+        if (CountReady >= Runner.ActivePlayers.Count())
+        {
+            var allPlayers = Runner.ActivePlayers.ToList();
+            if (allPlayers.Count > 0)
+                SeekerPlayerRef = allPlayers[Random.Range(0, allPlayers.Count)];
+
+            GameTime = 180;
+
+            RoleTimer = TickTimer.CreateFromSeconds(Runner, 10f);
+
+            GameStarted = true;
+        }
+    }
+
+    public string GetPlayerName(PlayerRef playerRef)
+    {
+        var playerObj = Runner.GetPlayerObject(playerRef);
+        if (playerObj != null)
+        {
+            var props = playerObj.GetComponent<PlayerProperties>();
+            if (props != null) return props.NickName.ToString();
+        }
+        return "Unknown";
     }
 }

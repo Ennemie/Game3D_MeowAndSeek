@@ -9,5 +9,15 @@ public class InputFixer : MonoBehaviour
         {
             InputSystem.EnableDevice(Mouse.current);
         }
+        if (Keyboard.current != null && !Keyboard.current.enabled)
+        {
+            InputSystem.EnableDevice(Keyboard.current);
+            Debug.Log("Keyboard enabled");
+        }
+
+        if (Gamepad.current != null && !Gamepad.current.enabled)
+        {
+            InputSystem.EnableDevice(Gamepad.current);
+        }
     }
 }

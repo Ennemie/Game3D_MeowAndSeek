@@ -1,6 +1,9 @@
 ﻿<Solution>
   <Project Path="Fusion.Unity.Editor.csproj" />
+  <Project Path="PlayFab.csproj" />
+  <Project Path="PlayFabEditorExtensions.csproj" />
   <Project Path="Fusion.Unity.csproj" />
   <Project Path="Assembly-CSharp.csproj" />
+  <Project Path="PlayFabSDKEditor.csproj" />
   <Project Path="Unity.Fusion.CodeGen.csproj" />
 </Solution>

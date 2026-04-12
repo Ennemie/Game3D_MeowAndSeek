@@ -6,59 +6,75 @@ using UnityEngine;
 public class PlayerSpawn : SimulationBehaviour, IPlayerJoined
 {
     [SerializeField] private GameObject playerPrefab;
+    [SerializeField] private NetworkObject gameManagerPrefab;
     [SerializeField] private Transform[] spawnPoints;
     public CanvaController canva;
 
     public void PlayerJoined(PlayerRef player)
     {
+        if (Runner.IsSharedModeMasterClient && GameManager.Instance == null)
+        {
+            Runner.Spawn(gameManagerPrefab, Vector3.zero, Quaternion.identity);
+        }
+
         if (player == Runner.LocalPlayer)
         {
-            StartCoroutine(WaitToSpawn(player));
+            StartCoroutine(DoSpawn(player));
         }
     }
-    IEnumerator WaitToSpawn(PlayerRef player)
-    {
-        // đợi một frame để Runner.ActivePlayers được cập nhật
-        yield return null;
-        Vector3 spawnPos = GetSpawnPoint(player).position;
-        Quaternion spawnRot = GetSpawnPoint(player).rotation;
 
-        Runner.Spawn(
+    public override void Render()
+    {
+        if (GameManager.Instance != null && !GameManager.Instance.Object.IsValid)
+        {
+        }
+    }
+
+    IEnumerator DoSpawn(PlayerRef player)
+    {
+        NetworkObject playerObj = Runner.Spawn(
             playerPrefab,
-            spawnPos,
-            spawnRot,
+            spawnPoints[0].position,
+            spawnPoints[0].rotation,
             player,
             (runner, obj) =>
             {
-                var setup = obj.GetComponent<PlayerSetup>();
+                runner.SetPlayerObject(player, obj);
 
-                if (setup != null)
-                {
-                    setup.SetupCamera(obj.transform);
-                }
-                else
-                {
-                    Debug.LogError("PlayerSetup not found on prefab");
-                }
+                var setup = obj.GetComponent<PlayerSetup>();
+                if (setup != null) setup.SetupCamera(obj.transform);
             });
 
-        canva.EnterGame();
+        yield return null;
+
+        Transform correctPoint = GetSpawnPoint(player);
+        TeleportPlayer(playerObj.gameObject, correctPoint);
+
+        if (canva != null) canva.EnterGame();
     }
+
+    private void TeleportPlayer(GameObject playerObj, Transform target)
+    {
+        var cc = playerObj.GetComponent<CharacterController>();
+
+        if (cc != null) cc.enabled = false;
+
+        playerObj.transform.position = target.position;
+        playerObj.transform.rotation = target.rotation;
+
+        if (cc != null) cc.enabled = true;
+    }
+
     private Transform GetSpawnPoint(PlayerRef player)
     {
-        var players = Runner.ActivePlayers.ToList();
-        // đảm bảo mọi client có cùng thứ tự
-        players.Sort((a, b) => a.RawEncoded.CompareTo(b.RawEncoded));
+        var playersList = Runner.ActivePlayers.ToList();
 
-        int index = players.IndexOf(player);
-        if (index < 0)
-        {
-            Debug.LogError("Player not found in ActivePlayers");
-            index = 0;
-        }
+        playersList.Sort((a, b) => a.RawEncoded.CompareTo(b.RawEncoded));
+
+        int index = playersList.IndexOf(player);
+        if (index < 0) index = 0;
 
         index = Mathf.Clamp(index, 0, spawnPoints.Length - 1);
-
         return spawnPoints[index];
     }
 }
