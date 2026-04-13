@@ -25,12 +25,12 @@ Transform:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 641757406391941475}
   serializedVersion: 2
-  m_LocalRotation: {x: -0, y: 0.7071068, z: -0, w: 0.7071068}
-  m_LocalPosition: {x: 0, y: 0.151, z: 0}
-  m_LocalScale: {x: 10, y: 1, z: 10}
+  m_LocalRotation: {x: -0, y: -0, z: -0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
-  m_Father: {fileID: 7497441589376318524}
+  m_Father: {fileID: 5803830729022090680}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!65 &265430840987660791
 BoxCollider:
@@ -685,7 +685,9 @@ GameObject:
   - component: {fileID: 2189340477317706317}
   - component: {fileID: 5486984190773470257}
   - component: {fileID: 4485145913437567934}
-  m_Layer: 0
+  - component: {fileID: -1803942033307038965}
+  - component: {fileID: 6117358468665044060}
+  m_Layer: 3
   m_Name: Player
   m_TagString: Untagged
   m_Icon: {fileID: 0}
@@ -708,6 +710,7 @@ Transform:
   - {fileID: 8092683921186366741}
   - {fileID: 2196371117607974547}
   - {fileID: 5857099806684611608}
+  - {fileID: 7186474088806077004}
   - {fileID: 7497441589376318524}
   - {fileID: 7884664055688660554}
   m_Father: {fileID: 0}
@@ -733,6 +736,7 @@ MonoBehaviour:
   - {fileID: 2909804755672297952}
   - {fileID: 8138861680714476374}
   - {fileID: 5486984190773470257}
+  - {fileID: -1803942033307038965}
   ForceRemoteRenderTimeframe: 0
 --- !u!143 &500673344523367626
 CharacterController:
@@ -885,13 +889,16 @@ MonoBehaviour:
   disguiseEffect: {fileID: 2071704351814327813}
   attackEffect: {fileID: 789783638893031731}
   _isAttacking: 0
+  attackBox: {fileID: 265430840987660791}
   shield: {fileID: 7797857224404408319}
   _isShieldActive: 0
   deadEffect: {fileID: 8424624472076354706, guid: d9cb716e92aeecf459267996971da144, type: 3}
   playerNameText: {fileID: 4150000962631994443}
   hpBar: {fileID: 623115057938890053}
   manaBar: {fileID: 8736947381109089281}
-  moewClip: {fileID: 8300000, guid: 5e837d5d71029a947a1ce2b0dfdd7be6, type: 3}
+  meowClip: {fileID: 8300000, guid: 5e837d5d71029a947a1ce2b0dfdd7be6, type: 3}
+  screamCatClip: {fileID: 8300000, guid: 54c855df62b713643a37b87128827ad7, type: 3}
+  iceCrackClip: {fileID: 8300000, guid: 8b05d8bc57a2b1e42abb36f61f3cbb9a, type: 3}
   animator: {fileID: 8092683921176840925}
   _CurrentState: 0
 --- !u!82 &4485145913437567934
@@ -991,6 +998,44 @@ AudioSource:
     m_PreInfinity: 2
     m_PostInfinity: 2
     m_RotationOrder: 4
+--- !u!114 &-1803942033307038965
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 4703452183148924094}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 1039544458, guid: e725a070cec140c4caffb81624c8c787, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Fusion.Runtime.dll::Fusion.HitboxRoot
+  Config: 3
+  BroadRadius: 0
+  Offset: {x: 0, y: 0, z: 0}
+  GizmosColor: {r: 0.5, g: 0.5, b: 0.5, a: 1}
+  Hitboxes:
+  - {fileID: 6117358468665044060}
+--- !u!114 &6117358468665044060
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 4703452183148924094}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 1014831617, guid: e725a070cec140c4caffb81624c8c787, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Fusion.Runtime.dll::Fusion.Hitbox
+  Type: 2
+  SphereRadius: 0.15
+  CapsuleRadius: 0
+  BoxExtents: {x: 0, y: 0, z: 0}
+  CapsuleExtents: 0
+  Offset: {x: 0, y: 0, z: 0}
+  Root: {fileID: -1803942033307038965}
+  GizmosColor: {r: 1, g: 0.92156863, b: 0.015686275, a: 1}
 --- !u!1 &6458231028731746850
 GameObject:
   m_ObjectHideFlags: 0
@@ -1848,10 +1893,7 @@ PrefabInstance:
       objectReference: {fileID: 0}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
-    m_AddedGameObjects:
-    - targetCorrespondingSourceObject: {fileID: 1644863641862175908, guid: 43b97fcf7457df843986b3b768a669e4, type: 3}
-      insertIndex: -1
-      addedObject: {fileID: 7186474088806077004}
+    m_AddedGameObjects: []
     m_AddedComponents:
     - targetCorrespondingSourceObject: {fileID: 6447763566865103921, guid: 43b97fcf7457df843986b3b768a669e4, type: 3}
       insertIndex: -1

@@ -8,6 +8,7 @@ public class PlayHubController : MonoBehaviour
     [SerializeField] private Button chatHubBtn;
     [SerializeField] private GameObject chatHubContainer;
     [SerializeField] private Button closeBtn;
+    [SerializeField] private CanvaController canvaController;
     // Start is called once before the first execution of Update after the MonoBehaviour is created
     void Start()
     {
@@ -19,6 +20,7 @@ public class PlayHubController : MonoBehaviour
     {
         chatHubBtn.gameObject.SetActive(false);
         chatHubContainer.SetActive(true);
+        canvaController.ScrollChatHubToBottom();
     }
     public void CloseChatHub()
         {

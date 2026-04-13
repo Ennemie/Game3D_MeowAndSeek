@@ -81,22 +81,30 @@ public class PlayerMovement : NetworkBehaviour
         {
             if (!playerProperties.attackEffect.gameObject.activeSelf)
             {
-                if (playerProperties.UseMana(30f)) playerProperties.isAttacking = true;
+                if (playerProperties.UseMana(30f))
+                {
+                    playerProperties.isAttacking = true;
+                    playerProperties.RPC_PlayIceCrack();
+                    playerProperties.StartAttackProcess();
+                }
             }
         }
         else
         {
             if (playerProperties.disguiseIndex == 0)
             {
-                // pick a random disguise (ensure there is at least one)
-                if (playerProperties.disguiseProps != null && playerProperties.disguiseProps.Count > 1)
+                if (playerProperties.UseMana(40f))
                 {
-                    playerProperties.disguiseIndex = Random.Range(1, playerProperties.disguiseProps.Count);
+                    // pick a random disguise (ensure there is at least one)
+                    if (playerProperties.disguiseProps != null && playerProperties.disguiseProps.Count > 1)
+                    {
+                        playerProperties.disguiseIndex = Random.Range(1, playerProperties.disguiseProps.Count);
 
-                    // start/reset the timer that will revert the disguise after 15s
-                    if (disguiseResetCoroutine != null) StopCoroutine(disguiseResetCoroutine);
-                    disguiseResetCoroutine = StartCoroutine(ResetDisguiseAfterDelay(disguiseTime));
-                    if(canvaController != null) canvaController.OpenDisguiseHub(playerProperties.NickName.ToString(), playerProperties.Hp, playerProperties.Mana, disguiseTime);
+                        // start/reset the timer that will revert the disguise after 15s
+                        if (disguiseResetCoroutine != null) StopCoroutine(disguiseResetCoroutine);
+                        disguiseResetCoroutine = StartCoroutine(ResetDisguiseAfterDelay(disguiseTime));
+                        if (canvaController != null) canvaController.OpenDisguiseHub(playerProperties.NickName.ToString(), playerProperties.Hp, playerProperties.Mana, disguiseTime);
+                    }
                 }
             }
             else

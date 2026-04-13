@@ -1,4 +1,5 @@
 using Fusion; // Cần thiết để dùng NetworkBehaviour và RPC
+using System.Collections;
 using TMPro;
 using UnityEngine;
 using UnityEngine.InputSystem;
@@ -52,6 +53,7 @@ public class ChatManager : NetworkBehaviour
         if (chatDisplay != null)
         {
             chatDisplay.text += formattedMessage;
+            GameManager.Instance.ScrollChatToBottom();
         }
 
         // Log ra Console để kiểm tra lỗi nếu có

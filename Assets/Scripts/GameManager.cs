@@ -1,4 +1,6 @@
 using Fusion;
+using PlayFab;
+using PlayFab.ClientModels;
 using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
@@ -16,6 +18,7 @@ public class GameManager : NetworkBehaviour
     [Networked] public PlayerRef SeekerPlayerRef { get; set; } = PlayerRef.None;
     [Networked] public TickTimer RoleTimer { get; set; }
     [Networked] public int GameTime { get; set; }
+    private int timer;
 
     [Header("References")]
     private CanvaController canva;
@@ -156,6 +159,19 @@ public class GameManager : NetworkBehaviour
     {
         if (_openingCam != null) _openingCam.SetActive(false);
 
+        // --- PHẦN VIẾT THÊM: Đồng bộ Nickname lên PlayFab Leaderboard ---
+        var myObj = Runner.GetPlayerObject(Runner.LocalPlayer);
+        if (myObj != null)
+        {
+            var props = myObj.GetComponent<PlayerProperties>();
+            if (props != null)
+            {
+                // Gọi hàm đồng bộ tên (Hàm UpdateNameOnLeaderboard ông đã thêm ở dưới)
+                UpdateNameOnLeaderboard(props.NickName.ToString());
+            }
+        }
+        // ---------------------------------------------------------------
+
         seekerCount = 0;
         hiderCount = 0;
 
@@ -235,7 +251,7 @@ public class GameManager : NetworkBehaviour
 
     private IEnumerator DisplayGameTimeRoutine()
     {
-        int timer = GameTime;
+        timer = GameTime;
         while (timer > 0 && GameStarted)
         {
             if (canva != null) canva.UpdateGameTime(timer);
@@ -258,13 +274,89 @@ public class GameManager : NetworkBehaviour
             canva.readiedHubText.text = "GAME KẾT THÚC!";
         }
 
-        if (hiderCount > 0)
+        // Xác định đội thắng
+        string finalWinner = hiderCount > 0 ? "HIDER" : "SEEKER";
+
+        if (canva != null)
+            canva.readiedHubText.text += $"\n<color={(hiderCount > 0 ? "green" : "red")}>{finalWinner} THẮNG!</color>";
+
+        // QUAN TRỌNG: Chỉ máy chủ (State Authority) mới được quyền gửi dữ liệu trận đấu
+        if (Object.HasStateAuthority)
         {
-            if (canva != null) canva.readiedHubText.text += $"\n<color=green>HIDER THẮNG!</color>";
+            CollectAndSendPlayFabData(finalWinner);
+        }
+
+        // Bắt đầu đếm ngược reset game
+        //StartCoroutine(ResetGame());
+    }
+    public void UpdateNameOnLeaderboard(string nickName)
+    {
+        var request = new UpdateUserTitleDisplayNameRequest
+        {
+            DisplayName = nickName
+        };
+
+        PlayFabClientAPI.UpdateUserTitleDisplayName(request,
+            result => Debug.Log("<color=green>PlayFab: Đã đồng bộ NickName lên Server!</color>"),
+            error => Debug.LogError("PlayFab: Lỗi đồng bộ tên: " + error.GenerateErrorReport())
+        );
+    }
+    private void CollectAndSendPlayFabData(string winnerTeam)
+    {
+        Debug.Log("[PlayFab] Đang thu thập dữ liệu cuối trận...");
+
+        MatchResult result = new MatchResult();
+        result.winnerTeam = winnerTeam;
+
+        int finalDuration = GameTime - timer;
+        result.durationSeconds = finalDuration;
+
+        foreach (var playerRef in Runner.ActivePlayers)
+        {
+            var playerObj = Runner.GetPlayerObject(playerRef);
+            if (playerObj != null)
+            {
+                var props = playerObj.GetComponent<PlayerProperties>();
+                if (props != null)
+                {
+                    MatchPlayerInfo pInfo = new MatchPlayerInfo();
+                    pInfo.playerName = props.NickName.ToString();
+                    pInfo.role = props.isSeeker ? "Seeker" : "Hider";
+
+                    if (winnerTeam == "SEEKER")
+                        pInfo.isWinner = props.isSeeker;
+                    else
+                        pInfo.isWinner = !props.isSeeker;
+
+                    result.players.Add(pInfo);
+                }
+            }
+        }
+
+        if (PlayFabManager.Instance != null && result.players.Count > 0)
+        {
+            // 1. Gửi Match Data (Player Data) và PlayStream Event qua hàm gộp
+            PlayFabManager.Instance.SendMatchDataAndEvent(result);
+
+            // 2. PHẦN CHỈNH SỬA: Cập nhật Bảng xếp hạng (Leaderboard)
+            var statsRequest = new UpdatePlayerStatisticsRequest
+            {
+                Statistics = new List<StatisticUpdate> {
+                    new StatisticUpdate {
+                        StatisticName = "BestDurationMatches", // Tên này phải khớp 100% trên Web
+                        Value = finalDuration
+                    }
+                }
+            };
+
+            PlayFabClientAPI.UpdatePlayerStatistics(statsRequest,
+                res => Debug.Log($"<color=yellow>PlayFab: Đã cập nhật Duration ({finalDuration}s) lên Leaderboard!</color>"),
+                err => Debug.LogError("PlayFab: Lỗi Leaderboard: " + err.GenerateErrorReport())
+            );
         }
         else
         {
-            if (canva != null) canva.readiedHubText.text += $"\n<color=red>SEEKER THẮNG!</color>";
+            Debug.LogWarning("[PlayFab] Không có dữ liệu để gửi hoặc PlayFabManager chưa khởi tạo!");
         }
     }
 
@@ -283,7 +375,7 @@ public class GameManager : NetworkBehaviour
             if (allPlayers.Count > 0)
                 SeekerPlayerRef = allPlayers[Random.Range(0, allPlayers.Count)];
 
-            GameTime = 180;
+            GameTime = 190;
 
             RoleTimer = TickTimer.CreateFromSeconds(Runner, 10f);
 
@@ -301,4 +393,8 @@ public class GameManager : NetworkBehaviour
         }
         return "Unknown";
     }
+    public void ScrollChatToBottom()
+    {
+        if (canva != null) canva.ScrollChatHubToBottom();
+    }   
 }

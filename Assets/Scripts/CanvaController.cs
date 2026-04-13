@@ -24,6 +24,7 @@ public class CanvaController : MonoBehaviour
 
     [Header("Play Hub")]
     public GameObject playHub;
+    public ScrollRect chatScrollRect;
     public TMP_Text gameTimeText;
 
     [Header("Disguise Hub")]
@@ -170,5 +171,22 @@ public class CanvaController : MonoBehaviour
     public void HideDeadHub()
     {
         deadHub.SetActive(false);
+    }
+    public void ScrollChatHubToBottom()
+    {
+        if (chatScrollRect != null)
+        {
+            // Cần đợi 1 frame để Unity cập nhật lại kích thước Content sau khi thêm chữ
+            StartCoroutine(ForceScrollDown());
+        }
+    }
+
+    private IEnumerator ForceScrollDown()
+    {
+        // Đợi đến cuối frame để UI Layout được tính toán lại xong
+        yield return new WaitForEndOfFrame();
+
+        // verticalNormalizedPosition = 0 là dưới cùng, 1 là trên cùng
+        chatScrollRect.verticalNormalizedPosition = 0f;
     }
 }

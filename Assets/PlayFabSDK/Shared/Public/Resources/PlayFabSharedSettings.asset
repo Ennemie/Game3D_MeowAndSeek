@@ -15,7 +15,7 @@ MonoBehaviour:
   TitleId: 13D11E
   DeveloperSecretKey: QCX4FPXWNFX3FUC134NHYRABXIFGYHEEOS1DYCPICO8JGXTZHT
   ProductionEnvironmentUrl: https://13D11E.playfabapi.com
-  RequestType: 2
+  RequestType: 0
   DisableDeviceInfo: 0
   DisableFocusTimeCollection: 0
   RequestTimeout: 2000
