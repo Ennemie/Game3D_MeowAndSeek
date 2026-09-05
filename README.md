@@ -325,39 +325,11 @@ PlayFabManager
 ChatManager
 ```
 
----
-
-## 📸 Screenshots
-
-### Gameplay
-
-<p align="center">
-  <img src="docs/images/gameplay.png" width="800" alt="Gameplay">
-</p>
-
-### Seeker
-
-<p align="center">
-  <img src="docs/images/seeker.png" width="800" alt="Seeker">
-</p>
-
-### Hider
-
-<p align="center">
-  <img src="docs/images/hider.png" width="800" alt="Hider">
-</p>
-
-> 💡 Thay các ảnh trên bằng screenshot thực tế của game trong thư mục `docs/images/`.
-
----
-
 ## 🎥 Demo
 
-> 🚧 **Gameplay video coming soon**
 
-<!--
-[![Meow And Seek Gameplay](https://img.youtube.com/vi/YOUR_VIDEO_ID/maxresdefault.jpg)](https://www.youtube.com/watch?v=YOUR_VIDEO_ID)
--->
+https://github.com/user-attachments/assets/904d443d-0843-4548-b91a-3cd8de7d89ed
+
 
 ---
 
