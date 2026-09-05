@@ -4,16 +4,6 @@
 
 > **Meow And Seek** là một game 3D multiplayer được phát triển bằng **Unity**, kết hợp **Photon Fusion** cho hệ thống networking và **PlayFab** cho backend/game data.
 
----
-
-## 🎬 Game Preview
-
-<p align="center">
-  <img src="docs/images/gameplay.png" width="850" alt="Meow And Seek Gameplay">
-</p>
-
-> 🚧 **Gameplay screenshot / GIF coming soon**
-
 <p align="center">
   <a href="https://github.com/Ennemie/Game3D_MeowAndSeek">
     <img src="https://img.shields.io/badge/GitHub-Repository-181717?style=for-the-badge&logo=github" alt="GitHub">
